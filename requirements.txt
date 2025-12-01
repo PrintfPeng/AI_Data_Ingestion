@@ -1,0 +1,4 @@
+pymupdf
+camelot-py
+pandas
+opencv-python
