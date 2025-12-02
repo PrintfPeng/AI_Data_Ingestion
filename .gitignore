@@ -1,24 +1,55 @@
-# Python cache
+# --- Python ---
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
+*.pyd
+*.egg-info/
+*.egg
+*.log
 
-# VS Code
-.vscode/
-
-# Virtual env
+# --- Virtual environment ---
 venv/
+ENV/
 env/
+.venv/
 
-# Output from ingestion pipeline
-ingested/*
+# --- IDE / Editor ---
+.vscode/
+.idea/
+*.swp
 
-# Do NOT ignore folder itself
-!ingested/.keep
-
-# PDFs sample
-samples/*
-
-# OS generated
+# --- OS Files ---
 .DS_Store
 Thumbs.db
+
+# --- Credentials / Environment ---
+.env
+*.key
+*.pem
+
+# --- Project Generated Data ---
+ingested/
+output/
+tmp/
+cache/
+logs/
+
+# --- PDF / Samples (avoid uploading private docs) ---
+samples/
+*.pdf
+
+# --- Google Gemini Cache ---
+.gemini/
+
+# --- Jupyter / Notebooks (if used later) ---
+.ipynb_checkpoints
+
+# --- PyTest / Coverage ---
+.coverage
+.cache
+pytest_cache/
+htmlcov/
+
+# --- Build ---
+build/
+dist/
