@@ -2,6 +2,9 @@ pymupdf
 camelot-py
 pandas
 opencv-python
+google-generativeai
+python-dotenv
+PyMuPDF
 
 fastapi
 uvicorn[standard]
