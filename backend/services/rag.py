@@ -18,6 +18,63 @@ def _get_llm() -> ChatGoogleGenerativeAI:
     )
     return llm
 
+
+# -------------------------------------------------------------------
+# 1) Rule-based intent (ถูก ๆ เร็ว ๆ ก่อน)
+# -------------------------------------------------------------------
+def _rule_based_intent(query: str) -> Optional[str]:
+    """
+    เดา intent แบบ rule-based ง่าย ๆ จาก keyword
+    คืนค่า: "text" | "table" | "both" | None
+    """
+    q = query.lower().strip()
+
+    table_keywords = [
+        "ตาราง",
+        "table",
+        "รายการ",
+        "transaction",
+        "ทรานแซคชัน",
+        "ยอดที่ต้องชำระ",
+        "ยอดใช้จ่ายรวม",
+        "แถวที่",
+        "คอลัมน์",
+    ]
+
+    image_keywords = [
+        "รูป",
+        "รูปภาพ",
+        "image",
+        "logo",
+        "โลโก้",
+        "กราฟ",
+        "graph",
+        "chart",
+        "แผนภาพ",
+    ]
+
+    # ถ้ามีคำที่ชัดว่าเกี่ยวกับตาราง
+    is_table = any(kw in q for kw in table_keywords)
+    is_image = any(kw in q for kw in image_keywords)
+
+    if is_table and not is_image:
+        return "table"
+    if is_image and not is_table:
+        # ตอนนี้เรายังไม่มี RAG ฝั่ง image หนัก ๆ → ให้ถือเป็น both ไปก่อน
+        return "both"
+    if is_table and is_image:
+        return "both"
+
+    # ถ้าไม่มี keyword พิเศษ → น่าจะ narrative text
+    if q:
+        return "text"
+
+    return None
+
+
+# -------------------------------------------------------------------
+# 2) LLM-based intent (ละเอียดแต่แพงกว่า)
+# -------------------------------------------------------------------
 async def classify_query_intent(query: str) -> str:
     """
     ใช้ LLM ช่วยบอกว่า query ต้องไปดู
@@ -42,16 +99,18 @@ async def classify_query_intent(query: str) -> str:
     resp = await llm.ainvoke(
         [("system", system_prompt), ("user", user_prompt)]
     )
-    raw = resp.content.strip().lower()
+    raw = (resp.content or "").strip().lower()
 
-    if "table" in raw:
-        return "table"
     if "both" in raw:
         return "both"
+    if "table" in raw:
+        return "table"
     return "text"
 
 
-
+# -------------------------------------------------------------------
+# 3) รวม context จากเอกสาร
+# -------------------------------------------------------------------
 def _build_context_text(docs) -> str:
     """
     รวม context จากเอกสารที่ค้นมาให้ LLM
@@ -67,45 +126,56 @@ def _build_context_text(docs) -> str:
     return "\n\n".join(parts)
 
 
+# -------------------------------------------------------------------
+# 4) main RAG function
+# -------------------------------------------------------------------
 async def answer_question(
     query: str,
     doc_ids: Optional[List[str]] = None,
     top_k: int = 5,
-    mode: str = "auto",   # "auto" | "text" | "table" | "both"
+    mode: str = "auto",  # "auto" | "text" | "table" | "both"
 ) -> Dict:
-
     """
     RAG flow:
-    1) classify intent → text / table / both
-    2) search จาก vector DB ด้วย filter ที่เหมาะสม
+    1) ตัดสินใจ intent → text / table / both (rule-based + LLM)
+    2) search จาก vector DB ด้วย filter ที่เหมาะสม (doc_ids + source)
     3) รวม context เป็น prompt
     4) ให้ LLM ตอบ
     """
 
-    # 1) classify intent
-    # 1) ตัดสินใจ intent / source_filter ตาม mode
+    # ----------------------------------------
+    # 1) ตัดสินใจ intent ตาม mode
+    # ----------------------------------------
     if mode == "auto":
-        # ให้ LLM ช่วย classify
-        intent = await classify_query_intent(query)
+        # ลองใช้ rule-based ก่อน
+        intent = _rule_based_intent(query)
+        if intent is None:
+            # ถ้าดูไม่ออก → ให้ LLM ช่วย classify
+            intent = await classify_query_intent(query)
     elif mode in ("text", "table", "both"):
         # ใช้ค่าที่ user เลือกบังคับเลย
         intent = mode
     else:
-        intent = "auto"  # กันพลาด ใส่ค่าแปลกๆ มาก็ถือว่า auto
-        intent = await classify_query_intent(query)
+        # mode แปลก → ถือว่า auto
+        intent = _rule_based_intent(query) or await classify_query_intent(query)
 
+    # map intent -> source_filter
     if intent == "text":
         source_filter = ["text"]
     elif intent == "table":
         source_filter = ["table"]
+    elif intent == "both":
+        # กรณี both: เราสนทั้ง text + table เป็นหลัก
+        source_filter = ["text", "table"]
     else:
-        # both หรือ auto แบบไม่จำกัด
+        # กันพลาด
         source_filter = None
 
-
-    # 2) search similar docs (ให้ vector_store ใช้ filter ตาม doc_ids + source)
+    # ----------------------------------------
+    # 2) search similar docs จาก vector DB
+    # ----------------------------------------
     docs = search_similar(
-        query,
+        query=query,
         k=top_k,
         doc_ids=doc_ids,
         sources=source_filter,
@@ -115,15 +185,20 @@ async def answer_question(
         return {
             "answer": "ไม่พบข้อมูลที่เกี่ยวข้องเพียงพอในฐานข้อมูลเอกสาร",
             "sources": [],
+            "intent": intent,
+            "mode": mode,
         }
 
+    # ----------------------------------------
+    # 3) เตรียม context ให้ LLM
+    # ----------------------------------------
     context_text = _build_context_text(docs)
 
     system_prompt = (
         "คุณเป็นผู้ช่วยวิเคราะห์เอกสารการเงิน/ธุรกรรมจาก PDF.\n"
         "ให้ตอบคำถามโดยอ้างอิงเฉพาะจาก CONTEXT ด้านล่างนี้เท่านั้น.\n"
         "ถ้าข้อมูลไม่พอ ให้ตอบว่า 'ไม่ทราบจากข้อมูลที่มีอยู่'.\n\n"
-        f"(query intent: {intent})\n\n"
+        f"(query intent: {intent}, mode: {mode})\n\n"
         "=== CONTEXT START ===\n"
         f"{context_text}\n"
         "=== CONTEXT END ===\n\n"
@@ -141,6 +216,9 @@ async def answer_question(
     )
     answer_text = resp.content if hasattr(resp, "content") else str(resp)
 
+    # ----------------------------------------
+    # 4) เตรียม sources สำหรับ frontend + history
+    # ----------------------------------------
     sources = []
     for d in docs:
         meta = d.metadata or {}
@@ -157,4 +235,5 @@ async def answer_question(
         "answer": answer_text,
         "sources": sources,
         "intent": intent,
+        "mode": mode,
     }

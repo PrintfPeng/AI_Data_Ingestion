@@ -1,20 +1,23 @@
 from __future__ import annotations
 
 from typing import List, Optional, Literal
+from pathlib import Path
+import shutil
+import subprocess
+import sys
 
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from fastapi.staticfiles import StaticFiles
-from pathlib import Path
-
-from backend.services.logger import append_log
-from backend.services.logger import read_logs
-
+from .services.logger import append_log, read_logs
 from .services.rag import answer_question
 
-from fastapi.responses import RedirectResponse
 
+# -----------------------------------------------------------
+# FastAPI app & Static frontend
+# -----------------------------------------------------------
 
 app = FastAPI(
     title="AI Data Ingestion Backend",
@@ -22,6 +25,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# เสิร์ฟไฟล์ frontend (index.html + assets) ที่ /app/
 frontend_path = Path(__file__).resolve().parents[1] / "frontend"
 app.mount(
     "/app",
@@ -29,6 +33,15 @@ app.mount(
     name="frontend",
 )
 
+
+# โฟลเดอร์สำหรับอัปโหลดไฟล์ PDF ใหม่
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# -----------------------------------------------------------
+# Health check
+# -----------------------------------------------------------
 
 @app.get("/health")
 async def health_check():
@@ -38,6 +51,10 @@ async def health_check():
         "version": "0.1.0",
     }
 
+
+# -----------------------------------------------------------
+# /ask (RAG + Intent + Logging)
+# -----------------------------------------------------------
 
 class AskRequest(BaseModel):
     query: str
@@ -51,8 +68,10 @@ class AskResponse(BaseModel):
     sources: List[dict]
     intent: str
 
+
 @app.post("/ask", response_model=AskResponse)
 async def ask(req: AskRequest):
+    # 1) เรียก RAG ตอบคำถาม
     result = await answer_question(
         query=req.query,
         doc_ids=req.doc_ids,
@@ -60,7 +79,7 @@ async def ask(req: AskRequest):
         mode=req.mode,
     )
 
-    # เขียน log ลงไฟล์
+    # 2) เขียน log ลงไฟล์ (กันไม่ให้ทำ API พังถ้า log มีปัญหา)
     try:
         append_log(
             {
@@ -73,11 +92,16 @@ async def ask(req: AskRequest):
                 "sources": result.get("sources"),
             }
         )
-    except Exception as e:
-        # กันไว้เฉย ๆ อย่าให้ logging ทำให้ API พัง
+    except Exception as e:  # noqa: BLE001
         print(f"[LOG_ERROR] {e!r}")
 
+    # 3) คืนค่าเป็น AskResponse (ตอบตรงตาม schema)
     return AskResponse(**result)
+
+
+# -----------------------------------------------------------
+# /history  (อ่าน log ย้อนหลัง)
+# -----------------------------------------------------------
 
 class HistoryItem(BaseModel):
     ts: str
@@ -110,7 +134,77 @@ def get_history(limit: int = 50):
 
     return items
 
+
+# -----------------------------------------------------------
+# /upload  (อัปโหลด PDF -> run_all -> ingest_doc)
+# -----------------------------------------------------------
+
+@app.post("/upload")
+async def upload_pdf(
+    file: UploadFile = File(...),
+    doc_id: str = Form(...),
+    doc_type: str = Form("bank_statement"),
+):
+    """
+    1) รับไฟล์ PDF จากผู้ใช้
+    2) เซฟลง uploads/<doc_id>.pdf
+    3) เรียก pipeline ฝั่ง Peng: scripts.run_all
+    4) เรียก backend.scripts.ingest_doc เพื่อ re-index vector DB
+    """
+
+    # 1) ตรวจไฟล์
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="รองรับเฉพาะไฟล์ PDF เท่านั้น")
+
+    if not doc_id.strip():
+        raise HTTPException(status_code=400, detail="ต้องระบุ doc_id")
+
+    # 2) เซฟไฟล์ลง uploads/
+    dest_path = UPLOAD_DIR / f"{doc_id}.pdf"
+    try:
+        with dest_path.open("wb") as f:
+            shutil.copyfileobj(file.file, f)
+    finally:
+        file.file.close()
+
+    # 3) เรียก pipeline ingestion+clean+enrich (scripts.run_all)
+    # ใช้วิธี subprocess เพื่อไม่ต้องเดา signature ของ run_all()
+    try:
+        cmd = [
+            sys.executable,
+            "-m",
+            "scripts.run_all",
+            str(dest_path),
+            "--doc-id",
+            doc_id,
+            "--doc-type",
+            doc_type,
+        ]
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:  # noqa: PERF203
+        raise HTTPException(
+            status_code=500,
+            detail=f"run_all pipeline error: {e}",
+        ) from e
+
+    # 4) re-index vector DB (backend.scripts.ingest_doc จะ scan โฟลเดอร์ ingested)
+    try:
+        cmd = [sys.executable, "-m", "backend.scripts.ingest_doc"]
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:  # noqa: PERF203
+        raise HTTPException(
+            status_code=500,
+            detail=f"re-index error (ingest_doc): {e}",
+        ) from e
+
+    return {"ok": True, "doc_id": doc_id}
+
+
+# -----------------------------------------------------------
+# Root redirect -> /app
+# -----------------------------------------------------------
+
 @app.get("/")
 def root():
     # redirect ไปหน้า frontend หลัก
-    return RedirectResponse(url="/app")
+    return RedirectResponse(url="/app/")

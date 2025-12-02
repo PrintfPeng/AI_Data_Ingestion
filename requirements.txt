@@ -11,3 +11,4 @@ chromadb
 langchain
 langchain-community
 langchain-google-genai
+python-multipart

@@ -3,230 +3,367 @@
   <head>
     <meta charset="utf-8" />
     <title>AI Data Ingestion – Demo</title>
-    <!-- Tailwind CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      /* ให้ฟอนต์สวยขึ้นนิด */
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+      }
+
+      /* ปรับ scrollbar ใน history ให้ดูเนียน ๆ */
+      .nice-scroll::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .nice-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .nice-scroll::-webkit-scrollbar-thumb {
+        background-color: rgba(148, 163, 184, 0.8);
+        border-radius: 999px;
+      }
+    </style>
   </head>
   <body
-    class="min-h-screen bg-gradient-to-br from-sky-100 via-white to-indigo-100 text-slate-900 text-[15px] lg:text-base"
+    class="min-h-screen bg-gradient-to-br from-sky-50 via-indigo-50 to-violet-50 text-slate-800"
   >
-    <!-- ใช้ w-full แทน max-w เพื่อให้กินเกือบเต็มจอ -->
-    <div class="w-full px-6 lg:px-12 py-8 lg:py-10">
+    <!-- Main container -->
+    <div class="min-h-screen flex flex-col">
       <!-- Header -->
-      <header
-        class="mb-10 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
-      >
-        <div>
-          <h1 class="text-3xl lg:text-4xl xl:text-5xl font-bold tracking-tight text-slate-900">
-            AI Data Ingestion <span class="text-indigo-600">Demo</span>
-          </h1>
-          <p class="mt-2 text-sm lg:text-base text-slate-600 max-w-3xl">
-            ถามคำถามจากเอกสารที่มีทั้ง <span class="font-semibold">Text / Table / Image</span>
-            พร้อมดู Intent, Sources และ History แบบครบ ๆ ในที่เดียว
-          </p>
-        </div>
-        <div
-          class="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 shadow border border-slate-200 text-xs lg:text-sm text-slate-600"
-        >
-          <span class="inline-flex h-2 w-2 rounded-full bg-emerald-400"></span>
-          Backend: FastAPI + RAG + Chroma
+      <header class="border-b border-slate-200/70 bg-white/80 backdrop-blur">
+        <div class="max-w-7xl mx-auto px-6 lg:px-10 py-4 flex items-center justify-between gap-4">
+          <div>
+            <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">
+              <span class="text-slate-900">AI</span>
+              <span class="text-indigo-500"> Data Ingestion</span>
+            </h1>
+            <p class="text-sm md:text-base text-slate-600 mt-1">
+              ถามคำถามจากเอกสารที่มีทั้ง <b>Text / Table / Image</b> พร้อมดู Intent, Sources และ History
+              แบบครบ ๆ ในที่เดียว
+            </p>
+          </div>
+
+          <div class="hidden md:flex flex-col items-end gap-1">
+            <span
+              class="inline-flex items-center gap-2 rounded-full bg-emerald-50 text-emerald-700 px-3 py-1 text-xs font-medium border border-emerald-100"
+            >
+              <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+              Backend: FastAPI + RAG + Chroma
+            </span>
+            <span
+              class="inline-flex items-center gap-2 rounded-full bg-sky-50 text-sky-700 px-3 py-1 text-xs font-medium border border-sky-100"
+            >
+              Multi-doc RAG + Intent Routing + Upload
+            </span>
+          </div>
         </div>
       </header>
 
-      <!-- Main layout: ใช้ grid กว้างเต็ม + history กว้างขึ้น -->
-      <main
-        class="grid gap-7 lg:gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,6fr)] items-start"
-      >
-        <!-- Ask Panel -->
-        <section
-          class="bg-white/95 rounded-3xl shadow-lg border border-slate-100 p-6 lg:p-7 space-y-5"
-        >
-          <div class="flex items-center justify-between gap-3">
-            <h2 class="text-xl lg:text-2xl font-semibold text-slate-900">
-              🧠 ถามระบบจากเอกสาร
-            </h2>
-            <span
-              class="rounded-full bg-indigo-50 px-4 py-1.5 text-xs lg:text-sm font-medium text-indigo-700"
-            >
-              Multi-doc RAG + Intent Routing
-            </span>
-          </div>
-
-          <!-- Query -->
-          <div>
-            <label
-              for="query"
-              class="block text-sm lg:text-base font-medium text-slate-700 mb-1.5"
-              >คำถาม</label
-            >
-            <textarea
-              id="query"
-              class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm lg:text-base shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"
-              placeholder="เช่น ยอดคงเหลือรวมสิ้นงวดเป็นเท่าไหร่? หรือ ยอดที่ต้องชำระทั้งหมดในรอบบิลนี้คือเท่าไหร่?"
-            ></textarea>
-          </div>
-
-          <!-- doc_ids -->
-          <div>
-            <label
-              for="doc_ids"
-              class="block text-sm lg:text-base font-medium text-slate-700 mb-1.5"
-            >
-              doc_ids
-              <span class="text-xs font-normal text-slate-500"
-                >(คั่นด้วย comma, เว้นว่าง = ทุกเอกสาร)</span
+      <!-- Content -->
+      <main class="flex-1">
+        <div class="max-w-7xl mx-auto px-6 lg:px-10 py-6 lg:py-8">
+          <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-6 xl:gap-8 items-start">
+            <!-- LEFT: Upload + Ask -->
+            <div class="space-y-6">
+              <!-- Upload card -->
+              <section
+                class="bg-white/90 shadow-lg shadow-slate-200/70 rounded-2xl border border-slate-100/80 p-5 md:p-6"
               >
-            </label>
-            <input
-              id="doc_ids"
-              type="text"
-              class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm lg:text-base shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"
-              placeholder="เช่น doc_001,doc_002 หรือเว้นว่าง"
-            />
-          </div>
-
-          <!-- Mode -->
-          <div>
-            <p class="block text-sm lg:text-base font-medium text-slate-700 mb-2">
-              โหมดการค้นหา (source)
-            </p>
-            <div
-              id="modeGroup"
-              class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm lg:text-base"
-            >
-              <label
-                class="flex items-center gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 px-3.5 py-3 cursor-pointer hover:bg-indigo-100"
-              >
-                <input
-                  type="radio"
-                  name="mode"
-                  value="auto"
-                  checked
-                  class="h-4 w-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
-                />
-                <span>
-                  <span class="font-medium">Auto</span>
-                  <span class="block text-xs text-slate-600"
-                    >ให้ระบบตัดสินใจเอง</span
+                <div class="flex items-center justify-between gap-3 mb-4">
+                  <div class="flex items-center gap-2">
+                    <div
+                      class="w-9 h-9 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center"
+                    >
+                      📄
+                    </div>
+                    <div>
+                      <h2 class="font-semibold text-lg md:text-xl">
+                        อัปโหลดไฟล์เอกสารใหม่
+                      </h2>
+                      <p class="text-xs md:text-sm text-slate-500">
+                        เลือกไฟล์ PDF แล้วระบบจะรัน ingestion + cleaning + enrich + index ให้อัตโนมัติ
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    class="hidden sm:inline-flex items-center rounded-full bg-slate-50 border border-slate-200 text-[11px] px-3 py-1 text-slate-500"
                   >
-                </span>
-              </label>
+                    Step 1 · Upload PDF → พร้อมถามในหน้าเดียว
+                  </span>
+                </div>
 
-              <label
-                class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3 cursor-pointer hover:bg-slate-100"
-              >
-                <input
-                  type="radio"
-                  name="mode"
-                  value="text"
-                  class="h-4 w-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
-                />
-                <span>
-                  <span class="font-medium">เฉพาะ Text</span>
-                  <span class="block text-xs text-slate-600"
-                    >ดึงแต่เนื้อหาบรรยาย</span
-                  >
-                </span>
-              </label>
+                <div class="grid md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-4 md:gap-6">
+                  <div class="space-y-3">
+                    <label class="block text-xs font-medium text-slate-600 mb-1">
+                      เลือกไฟล์ PDF
+                    </label>
+                    <input
+                      id="uploadFile"
+                      type="file"
+                      accept="application/pdf"
+                      class="block w-full text-sm text-slate-700
+                             file:mr-4 file:py-2 file:px-4
+                             file:rounded-xl file:border-0
+                             file:text-sm file:font-semibold
+                             file:bg-indigo-50 file:text-indigo-600
+                             hover:file:bg-indigo-100
+                             cursor-pointer"
+                    />
+                  </div>
 
-              <label
-                class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3 cursor-pointer hover:bg-slate-100"
-              >
-                <input
-                  type="radio"
-                  name="mode"
-                  value="table"
-                  class="h-4 w-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
-                />
-                <span>
-                  <span class="font-medium">เฉพาะ Table</span>
-                  <span class="block text-xs text-slate-600"
-                    >ดึงข้อมูลจากตาราง</span
-                  >
-                </span>
-              </label>
+                  <div class="space-y-3">
+                    <div>
+                      <label class="block text-xs font-medium text-slate-600 mb-1">
+                        doc_id (ตัวอย่าง: doc_001)
+                      </label>
+                      <input
+                        id="uploadDocId"
+                        type="text"
+                        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 bg-slate-50"
+                        placeholder="เช่น doc_001"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-slate-600 mb-1">
+                        doc_type (optional)
+                      </label>
+                      <input
+                        id="uploadDocType"
+                        type="text"
+                        class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 bg-slate-50"
+                        placeholder="เช่น bank_statement (ค่าเริ่มต้น)"
+                      />
+                    </div>
+                  </div>
+                </div>
 
-              <label
-                class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3 cursor-pointer hover:bg-slate-100"
-              >
-                <input
-                  type="radio"
-                  name="mode"
-                  value="both"
-                  class="h-4 w-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
-                />
-                <span>
-                  <span class="font-medium">Text + Table</span>
-                  <span class="block text-xs text-slate-600"
-                    >ใช้ทั้งสองแบบร่วมกัน</span
+                <div class="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <button
+                    id="uploadBtn"
+                    class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-500 to-violet-500 shadow-sm hover:from-indigo-600 hover:to-violet-600 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-400"
                   >
-                </span>
-              </label>
+                    ⬆️ อัปโหลด + ประมวลผล
+                  </button>
+                  <p
+                    id="uploadStatus"
+                    class="text-xs md:text-sm text-slate-500 min-h-[1.5rem]"
+                  ></p>
+                </div>
+              </section>
+
+              <!-- Ask card -->
+              <section
+                class="bg-white/90 shadow-lg shadow-slate-200/70 rounded-2xl border border-slate-100/80 p-5 md:p-6"
+              >
+                <div class="flex items-center justify-between gap-3 mb-4">
+                  <div class="flex items-center gap-2">
+                    <div
+                      class="w-9 h-9 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center"
+                    >
+                      💬
+                    </div>
+                    <div>
+                      <h2 class="font-semibold text-lg md:text-xl">
+                        ถามระบบจากเอกสาร
+                      </h2>
+                      <p class="text-xs md:text-sm text-slate-500">
+                        รองรับ Multi-doc RAG + Intent Routing ระหว่าง Text / Table
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    class="hidden sm:inline-flex items-center rounded-full bg-indigo-50 text-indigo-600 text-[11px] font-medium px-3 py-1 border border-indigo-100"
+                  >
+                    Multi-doc RAG + Intent Routing
+                  </span>
+                </div>
+
+                <div class="space-y-4">
+                  <!-- Query -->
+                  <div>
+                    <label
+                      class="block text-xs font-medium text-slate-600 mb-1"
+                    >
+                      คำถาม
+                    </label>
+                    <textarea
+                      id="query"
+                      class="w-full rounded-2xl border border-slate-200 px-3.5 py-2.5 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 min-h-[80px] resize-y"
+                      placeholder="เช่น ยอดคงเหลือรวมสิ้นงวดเป็นเท่าไหร่? หรือ ยอดที่ต้องชำระทั้งหมดในรอบบิลนี้คือเท่าไหร่?"
+                    ></textarea>
+                  </div>
+
+                  <!-- doc_ids -->
+                  <div>
+                    <label
+                      class="block text-xs font-medium text-slate-600 mb-1"
+                    >
+                      doc_ids
+                      <span class="text-slate-400">
+                        (คั่นด้วย comma, เว้นว่าง = ทุกเอกสาร)
+                      </span>
+                    </label>
+                    <input
+                      id="doc_ids"
+                      type="text"
+                      class="w-full rounded-2xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"
+                      placeholder="เช่น doc_001,doc_002 หรือเว้นว่าง"
+                    />
+                  </div>
+
+                  <!-- Mode -->
+                  <div>
+                    <label
+                      class="block text-xs font-medium text-slate-600 mb-2"
+                    >
+                      โหมดการค้นหา (source)
+                    </label>
+                    <div
+                      id="modeGroup"
+                      class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm"
+                    >
+                      <label
+                        class="flex items-center justify-between gap-2 rounded-2xl border border-indigo-200 bg-indigo-50/60 px-3.5 py-2 cursor-pointer"
+                      >
+                        <span class="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="mode"
+                            value="auto"
+                            checked
+                            class="text-indigo-500 focus:ring-indigo-400"
+                          />
+                          <span class="font-semibold">Auto</span>
+                        </span>
+                        <span class="text-[11px] text-slate-500">
+                          ให้ระบบตัดสินใจเอง
+                        </span>
+                      </label>
+
+                      <label
+                        class="flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2 cursor-pointer"
+                      >
+                        <span class="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="mode"
+                            value="text"
+                            class="text-indigo-500 focus:ring-indigo-400"
+                          />
+                          <span class="font-semibold">เฉพาะ Text</span>
+                        </span>
+                        <span class="text-[11px] text-slate-500">
+                          เน้นเนื้อหาบรรยาย
+                        </span>
+                      </label>
+
+                      <label
+                        class="flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2 cursor-pointer"
+                      >
+                        <span class="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="mode"
+                            value="table"
+                            class="text-indigo-500 focus:ring-indigo-400"
+                          />
+                          <span class="font-semibold">เฉพาะ Table</span>
+                        </span>
+                        <span class="text-[11px] text-slate-500">
+                          ดึงข้อมูลจากตาราง
+                        </span>
+                      </label>
+
+                      <label
+                        class="flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2 cursor-pointer"
+                      >
+                        <span class="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="mode"
+                            value="both"
+                            class="text-indigo-500 focus:ring-indigo-400"
+                          />
+                          <span class="font-semibold">Text + Table</span>
+                        </span>
+                        <span class="text-[11px] text-slate-500">
+                          ใช้ทั้งข้อความและตาราง
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Ask button + Answer -->
+                  <div class="pt-1 flex flex-col gap-4">
+                    <button
+                      id="askBtn"
+                      class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl text-sm md:text-base font-semibold text-white bg-gradient-to-r from-fuchsia-500 via-indigo-500 to-sky-500 shadow-md hover:from-fuchsia-600 hover:via-indigo-600 hover:to-sky-600 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-fuchsia-400"
+                    >
+                      <span>🚀</span>
+                      <span>ถามระบบ</span>
+                    </button>
+
+                    <div
+                      id="result"
+                      class="hidden rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm md:text-base"
+                    >
+                      <div id="answerText" class="font-medium"></div>
+                      <div
+                        id="intentText"
+                        class="text-xs md:text-sm text-slate-500 mt-1"
+                      ></div>
+                      <pre
+                        id="sources"
+                        class="mt-2 text-xs md:text-[13px] text-slate-500 whitespace-pre-line"
+                      ></pre>
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
-          </div>
 
-          <!-- Button -->
-          <div class="pt-1">
-            <button
-              id="askBtn"
-              class="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3 text-sm lg:text-base font-semibold text-white shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            <!-- RIGHT: History -->
+            <section
+              class="bg-white/90 shadow-lg shadow-slate-200/70 rounded-2xl border border-slate-100/80 p-5 md:p-6 h-[520px] xl:h-[560px] flex flex-col"
             >
-              <span>🚀 ถามระบบ</span>
-            </button>
-          </div>
+              <div class="flex items-center justify-between gap-3 mb-3">
+                <div class="flex items-center gap-2">
+                  <div
+                    class="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center"
+                  >
+                    🧾
+                  </div>
+                  <div>
+                    <h2 class="font-semibold text-lg">History</h2>
+                    <p class="text-xs text-slate-500">
+                      บันทึก Q&A ล่าสุด (เรียงจากใหม่ → เก่า)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  id="loadHistoryBtn"
+                  class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-900 text-white hover:bg-slate-800"
+                >
+                  🔄 รีเฟรช
+                </button>
+              </div>
 
-          <!-- Result -->
-          <div
-            id="result"
-            class="mt-3 hidden rounded-2xl border border-slate-100 bg-slate-50/80 p-4 space-y-2"
-          >
-            <div
-              id="answerText"
-              class="text-sm lg:text-base text-slate-900 font-medium"
-            ></div>
-            <div
-              id="intentText"
-              class="text-xs lg:text-sm text-indigo-700 bg-indigo-50 inline-flex px-3 py-1 rounded-full"
-            ></div>
-            <div
-              id="sources"
-              class="text-xs lg:text-sm text-slate-600 whitespace-pre-line"
-            ></div>
+              <div
+                id="historyBox"
+                class="nice-scroll flex-1 rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-3 text-xs md:text-[13px] text-slate-700 overflow-y-auto leading-relaxed whitespace-pre-line"
+              ></div>
+            </section>
           </div>
-        </section>
-
-        <!-- History Panel -->
-        <section
-          class="bg-white/95 rounded-3xl shadow-lg border border-slate-100 p-6 lg:p-7 space-y-3"
-        >
-          <div class="flex items-center justify-between gap-3">
-            <h2
-              class="text-lg lg:text-xl font-semibold text-slate-900 flex items-center gap-2"
-            >
-              📜 History
-              <span class="text-xs font-normal text-slate-500"
-                >(Q&A ล่าสุด)</span
-              >
-            </h2>
-            <button
-              id="loadHistoryBtn"
-              class="inline-flex items-center gap-1.5 rounded-full bg-slate-900/90 px-3.5 py-1.5 text-xs lg:text-sm font-medium text-white shadow hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:ring-offset-2"
-            >
-              🔄 รีเฟรช
-            </button>
-          </div>
-
-          <div
-            id="historyBox"
-            class="mt-1 max-h-[600px] overflow-y-auto rounded-2xl bg-slate-50/80 px-3.5 py-3 text-xs lg:text-sm text-slate-700 whitespace-pre-line"
-          >
-            ยังไม่มี history
-          </div>
-        </section>
+        </div>
       </main>
     </div>
 
+    <!-- Scripts -->
     <script>
-      const btn = document.getElementById("askBtn");
+      const askBtn = document.getElementById("askBtn");
       const queryEl = document.getElementById("query");
       const docIdsEl = document.getElementById("doc_ids");
       const resultBox = document.getElementById("result");
@@ -235,6 +372,12 @@
       const intentText = document.getElementById("intentText");
       const loadHistoryBtn = document.getElementById("loadHistoryBtn");
       const historyBox = document.getElementById("historyBox");
+
+      const uploadBtn = document.getElementById("uploadBtn");
+      const uploadFile = document.getElementById("uploadFile");
+      const uploadDocId = document.getElementById("uploadDocId");
+      const uploadDocType = document.getElementById("uploadDocType");
+      const uploadStatus = document.getElementById("uploadStatus");
 
       function getSelectedMode() {
         const radios = document.querySelectorAll('input[name="mode"]');
@@ -264,7 +407,6 @@
             const a = item.answer || "";
             const mode = item.mode || "auto";
             const intent = item.intent || "-";
-
             const docIds =
               item.doc_ids && item.doc_ids.length
                 ? item.doc_ids.join(", ")
@@ -272,10 +414,10 @@
 
             return [
               `#${idx + 1} [${ts}]`,
-              `  mode=${mode}, intent=${intent}`,
-              `  doc_ids=${docIds}`,
-              `  Q: ${q}`,
-              `  A: ${a}`,
+              `mode=${mode}, intent=${intent}`,
+              `doc_ids=${docIds}`,
+              `Q: ${q}`,
+              `A: ${a}`,
             ].join("\n");
           });
 
@@ -287,7 +429,8 @@
         }
       }
 
-      btn.onclick = async () => {
+      // ---------- Ask RAG ----------
+      askBtn.onclick = async () => {
         const query = queryEl.value.trim();
         if (!query) {
           alert("พิมพ์คำถามก่อน");
@@ -313,10 +456,10 @@
         };
 
         answerText.textContent = "กำลังคิด...";
-        if (intentText) intentText.textContent = "";
+        intentText.textContent = "";
         sourcesEl.textContent = "";
         resultBox.classList.remove("hidden");
-        btn.disabled = true;
+        askBtn.disabled = true;
 
         try {
           const res = await fetch("/ask", {
@@ -333,15 +476,12 @@
           }
 
           const data = await res.json();
-
           answerText.textContent = data.answer || "(ไม่มีคำตอบ)";
 
-          if (intentText) {
-            if (data.intent) {
-              intentText.textContent = "Intent: " + data.intent;
-            } else {
-              intentText.textContent = "";
-            }
+          if (data.intent) {
+            intentText.textContent = "Intent: " + data.intent;
+          } else {
+            intentText.textContent = "";
           }
 
           if (data.sources && data.sources.length) {
@@ -354,26 +494,82 @@
             sourcesEl.textContent = "Sources: (ไม่มี)";
           }
 
-          // รีโหลด history หลังตอบเสร็จ
+          // reload history หลังถาม
           loadHistory();
         } catch (err) {
           console.error(err);
           answerText.textContent =
             "เออเรอร์ตอนเรียก /ask ดู console เพิ่มเติม";
-          if (intentText) intentText.textContent = "";
+          intentText.textContent = "";
           sourcesEl.textContent = "";
         } finally {
-          btn.disabled = false;
+          askBtn.disabled = false;
         }
       };
 
-      // ปุ่มรีเฟรช history
-      loadHistoryBtn.onclick = () => {
-        loadHistory();
+      // ---------- Upload PDF ----------
+      uploadBtn.onclick = async () => {
+        const file = uploadFile.files[0];
+        const docId = uploadDocId.value.trim();
+        const docType =
+          uploadDocType.value.trim() || "bank_statement";
+
+        if (!file) {
+          alert("เลือกไฟล์ PDF ก่อน");
+          return;
+        }
+        if (!docId) {
+          alert("กรุณากรอก doc_id");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("doc_id", docId);
+        formData.append("doc_type", docType);
+
+        uploadBtn.disabled = true;
+        uploadStatus.textContent = "กำลังอัปโหลด + ประมวลผลเอกสาร...";
+        uploadStatus.className =
+          "text-xs md:text-sm text-slate-600 min-h-[1.5rem]";
+
+        try {
+          const res = await fetch("/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(`status ${res.status}: ${txt}`);
+          }
+
+          const data = await res.json();
+          uploadStatus.textContent = `สำเร็จ: เอกสารถูกประมวลผลแล้ว (doc_id=${data.doc_id})`;
+          uploadStatus.className =
+            "text-xs md:text-sm text-emerald-600 min-h-[1.5rem]";
+
+          // อัปเดตช่อง doc_ids ให้ถามกับ doc ใหม่นี้สะดวก ๆ
+          docIdsEl.value = data.doc_id;
+
+          // reload history เผื่อในอนาคต log การ upload
+          loadHistory();
+        } catch (err) {
+          console.error(err);
+          uploadStatus.textContent =
+            "อัปโหลด/ประมวลผลล้มเหลว ดู console เพิ่มเติม";
+          uploadStatus.className =
+            "text-xs md:text-sm text-red-500 min-h-[1.5rem]";
+        } finally {
+          uploadBtn.disabled = false;
+        }
       };
 
-      // โหลด history ครั้งแรก
-      loadHistory();
+      // ---------- History button ----------
+      loadHistoryBtn.onclick = loadHistory;
+
+      // load history ตอนเปิดหน้า
+      document.addEventListener("DOMContentLoaded", loadHistory);
     </script>
   </body>
 </html>
