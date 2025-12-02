@@ -1,5 +1,6 @@
 from __future__ import annotations
 from ingestion.validator import validate_all
+from ingestion.ocr_extractor import ocr_extract_document
 
 
 """

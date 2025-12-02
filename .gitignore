@@ -1,0 +1,24 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# VS Code
+.vscode/
+
+# Virtual env
+venv/
+env/
+
+# Output from ingestion pipeline
+ingested/*
+
+# Do NOT ignore folder itself
+!ingested/.keep
+
+# PDFs sample
+samples/*
+
+# OS generated
+.DS_Store
+Thumbs.db
