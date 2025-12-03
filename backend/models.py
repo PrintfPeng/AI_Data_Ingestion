@@ -117,16 +117,15 @@ class ImageItem(BaseModel):
 
 class Metadata(BaseModel):
     """
-    metadata.json จากฝั่ง Peng (ผ่าน run_ingestion)
-    ตัวอย่าง:
+    metadata.json
+
     {
       "doc_id": "doc_001",
-      "file_name": "statement_nov_2025.pdf",
-      "doc_type": "bank_statement",
+      "file_name": "my_document.pdf",
+      "doc_type": "generic_doc",
       "page_count": 8,
       "ingested_at": "2025-12-01T10:00:00",
-      "source": "uploaded_by_user",
-      ... (field เพิ่มเติมอื่น ๆ ที่ Peng ใส่ได้)
+      "source": "uploaded_by_user"
     }
     """
 
