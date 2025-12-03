@@ -40,6 +40,8 @@ MODEL_CANDIDATES = [
     "models/gemini-2.5-flash",        # ตัวเร็ว ใช้แทนได้
 ]
 
+GEMINI_MODEL_NAME = "models/gemini-2.5-pro"
+
 
 # -------------------------
 # HELPER FUNCTION
@@ -67,33 +69,24 @@ def classify_document_rule_based(doc: IngestedDocument) -> str:
     sample = _collect_sample_text(doc.texts).lower()
 
     # rule from file name
-    if "statement" in file_name or "bank" in file_name:
+    if "statement" in file_name and "bank" in file_name:
         return "bank_statement"
     if "invoice" in file_name:
         return "invoice"
-    if "receipt" in file_name or "slip" in file_name:
+    if "receipt" in file_name:
         return "receipt"
-    if "po" in file_name or "purchase" in file_name:
+    if "po_" in file_name or "purchase_order" in file_name:
         return "purchase_order"
 
-    # rule จาก keyword
-    if "ใบแจ้งยอด" in sample or "ยอดคงเหลือ" in sample or "account" in sample:
+    # rule from content
+    if "account summary" in sample and "statement period" in sample:
         return "bank_statement"
-
-    if "tax invoice" in sample or "ใบกำกับภาษี" in sample:
+    if "invoice no" in sample or "tax invoice" in sample:
         return "invoice"
-
-    if "received with thanks" in sample or "ใบเสร็จ" in sample:
+    if "receipt no" in sample or "thank you for your payment" in sample:
         return "receipt"
-
-    # ตรวจ pattern ตัวเลขยอดเงิน
-    import re
-    if re.search(r"\d{1,3}(,\d{3})+\.\d{2}", sample):
-        return "bank_statement"
-
-    # ธนาคารรัฐไทย → GFMIS
-    if "gfmis" in sample or "gfmis thai" in sample:
-        return "bank_statement"
+    if "purchase order" in sample:
+        return "purchase_order"
 
     return "generic"
 
@@ -107,35 +100,24 @@ def classify_document_with_gemini(
 ) -> str:
     """
     ใช้ Gemini จำแนกประเภทเอกสาร
-    - ถ้า model_name ไม่มี → auto select จาก MODEL_CANDIDATES
+    - ใช้โมเดล fix ตัวเดียว (GEMINI_MODEL_NAME)
+    - ไม่เรียก list_models() แล้ว เพื่อลดโอกาสเจอ error แปลก ๆ จาก API
     """
-
     try:
         import google.generativeai as genai
         import os
 
         # โหลด API KEY
-        api_key = os.getenv("GOOGLE_API_KEY")
+        api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            print("[document_classifier] GOOGLE_API_KEY not set → fallback")
+            print("[document_classifier] GEMINI_API_KEY not set → fallback")
             return classify_document_rule_based(doc)
 
         genai.configure(api_key=api_key)
 
-        # เลือกโมเดลอัตโนมัติ
+        # ถ้าไม่ส่งชื่อโมเดลมา ใช้ค่าคงที่ของเราเอง
         if model_name is None:
-            available = [m.name for m in genai.list_models()]
-            chosen = None
-            for cand in MODEL_CANDIDATES:
-                if cand in available:
-                    chosen = cand
-                    break
-
-            if chosen is None:
-                print("[document_classifier] No valid Gemini model → fallback")
-                return classify_document_rule_based(doc)
-
-            model_name = chosen
+            model_name = GEMINI_MODEL_NAME
 
         print(f"[document_classifier] Using Gemini model: {model_name}")
         model = genai.GenerativeModel(model_name)
@@ -154,19 +136,16 @@ File name: {doc.metadata.file_name}
 
 Text sample:
 \"\"\"{sample_text}\"\"\"
-
-Respond ONLY with a label from the list above.
 """
 
         resp = model.generate_content(prompt)
         answer = (resp.text or "").strip().lower()
+        print("[document_classifier] Gemini raw answer:", answer)
 
-        # ทำให้ label เข้ากับชุดที่เรามี
-        for t in CANDIDATE_TYPES:
-            if answer == t:
-                return t
+        # normalize
+        answer = answer.replace("label:", "").strip()
 
-        # fuzzy match
+        # fuzzy match แบบง่าย ๆ
         if "bank" in answer and "statement" in answer:
             return "bank_statement"
         if "invoice" in answer:
@@ -185,25 +164,30 @@ Respond ONLY with a label from the list above.
 
 
 # ============================================================
-# MAIN ENTRY
+# PUBLIC ENTRYPOINT
 # ============================================================
-def classify_document(
-    doc: IngestedDocument,
-    use_gemini: bool = False,
-) -> str:
-    """เลือกว่าจะใช้ AI หรือ rule-based"""
-    if use_gemini:
-        return classify_document_with_gemini(doc)
-    return classify_document_rule_based(doc)
+def classify_document(doc: IngestedDocument, use_gemini: bool = True) -> str:
+    """
+    เลือกว่าจะใช้ rule-based หรือ Gemini
+    """
+    if not use_gemini:
+        return classify_document_rule_based(doc)
+
+    # พยายามใช้ Gemini ก่อน
+    return classify_document_with_gemini(doc)
 
 
-# TEST MODE
+# ============================================================
+# CLI TEST
+# ============================================================
 if __name__ == "__main__":
     import json
     from pathlib import Path
 
-    meta_path = Path("ingested/sample/metadata.json")
-    text_path = Path("ingested/sample/text.json")
+    # ทดสอบโหลดจาก ingested/sample
+    root = Path("ingested") / "sample"
+    meta_path = root / "metadata.json"
+    text_path = root / "text.json"
 
     if not meta_path.exists() or not text_path.exists():
         print("Please run ingestion first.")

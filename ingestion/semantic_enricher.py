@@ -29,7 +29,8 @@ GEMINI_MODEL = "models/gemini-2.5-pro"
 
 def _get_gemini_model():
     """คืนโมเดล Gemini ถ้ามี API KEY; ถ้าไม่มีให้คืน None"""
-    api_key = os.getenv("GOOGLE_API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY")
+    print("[DEBUG semantic_enricher] GEMINI_API_KEY prefix:", (api_key or "None")[:10])
     if not api_key:
         return None
     try:
