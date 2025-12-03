@@ -8,8 +8,23 @@ from langchain_community.vectorstores import Chroma
 from .chunking import Chunk
 from .embeddings import get_embedding_client
 
+from fastapi import HTTPException
+from langchain_google_genai._common import GoogleGenerativeAIError
+
 CHROMA_DIR = "chroma_db"
 COLLECTION_NAME = "documents"
+
+
+def search_similar(query: str, top_k: int = 5):
+    try:
+        docs = vectordb.similarity_search(query, k=top_k)
+        return docs
+    except GoogleGenerativeAIError as e:
+        print("Embedding error:", e)  # log หลังบ้าน
+        raise HTTPException(
+            status_code=500,
+            detail="Embedding error: โปรดตรวจสอบ GOOGLE_API_KEY ใน .env (อาจใช้ไม่ได้ / หมดอายุ / ถูกปิด)"
+        )
 
 
 def get_vector_store(

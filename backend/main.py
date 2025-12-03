@@ -33,7 +33,6 @@ app.mount(
     name="frontend",
 )
 
-
 # โฟลเดอร์สำหรับอัปโหลดไฟล์ PDF ใหม่
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -143,7 +142,9 @@ def get_history(limit: int = 50):
 async def upload_pdf(
     file: UploadFile = File(...),
     doc_id: str = Form(...),
-    doc_type: str = Form("bank_statement"),
+    # เดิม: doc_type: str = Form("bank_statement")
+    # ใหม่: ปล่อยว่างได้ ถ้าไม่ส่งมาจะ default = "generic_doc"
+    doc_type: str = Form(""),
 ):
     """
     1) รับไฟล์ PDF จากผู้ใช้
@@ -151,6 +152,10 @@ async def upload_pdf(
     3) เรียก pipeline ฝั่ง Peng: scripts.run_all
     4) เรียก backend.scripts.ingest_doc เพื่อ re-index vector DB
     """
+
+    # 0) normalize doc_type ให้มีค่าเสมอ
+    if not doc_type or not doc_type.strip():
+        doc_type = "generic_doc"
 
     # 1) ตรวจไฟล์
     if not file.filename.lower().endswith(".pdf"):
@@ -168,7 +173,6 @@ async def upload_pdf(
         file.file.close()
 
     # 3) เรียก pipeline ingestion+clean+enrich (scripts.run_all)
-    # ใช้วิธี subprocess เพื่อไม่ต้องเดา signature ของ run_all()
     try:
         cmd = [
             sys.executable,
@@ -197,7 +201,7 @@ async def upload_pdf(
             detail=f"re-index error (ingest_doc): {e}",
         ) from e
 
-    return {"ok": True, "doc_id": doc_id}
+    return {"ok": True, "doc_id": doc_id, "doc_type": doc_type}
 
 
 # -----------------------------------------------------------
