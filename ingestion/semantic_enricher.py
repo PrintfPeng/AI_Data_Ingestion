@@ -11,8 +11,8 @@ semantic_enricher.py
 5) Mapping Prepare: ดึงรายการ transaction ออกมาในรูปแบบโครงสร้าง
 
 ทำงานได้ทั้งแบบ:
-- rule-based อย่างเดียว (ถ้าไม่มี GEMINI_API_KEY)
-- ใช้ Gemini ช่วย (ถ้ามี GEMINI_API_KEY)
+- rule-based อย่างเดียว (ถ้าไม่มี GOOGLE_API_KEY)
+- ใช้ Gemini ช่วย (ถ้ามี GOOGLE_API_KEY)
 """
 
 from typing import List, Dict, Any, Optional
@@ -29,7 +29,7 @@ GEMINI_MODEL = "models/gemini-2.5-pro"
 
 def _get_gemini_model():
     """คืนโมเดล Gemini ถ้ามี API KEY; ถ้าไม่มีให้คืน None"""
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
         return None
     try:
@@ -77,7 +77,7 @@ def tag_sections(
 ) -> IngestedDocument:
     """
     ใส่ section label ลงใน TextBlock.extra["section"]
-    ถ้า use_gemini=True + มี GEMINI_API_KEY → ใช้ LLM ช่วย
+    ถ้า use_gemini=True + มี GOOGLE_API_KEY → ใช้ LLM ช่วย
     ถ้า error หรือไม่มี KEY → fallback เป็น rule-based (_guess_section_rule)
     """
 

@@ -115,9 +115,9 @@ def classify_document_with_gemini(
         import os
 
         # โหลด API KEY
-        api_key = os.getenv("GEMINI_API_KEY")
+        api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
-            print("[document_classifier] GEMINI_API_KEY not set → fallback")
+            print("[document_classifier] GOOGLE_API_KEY not set → fallback")
             return classify_document_rule_based(doc)
 
         genai.configure(api_key=api_key)
