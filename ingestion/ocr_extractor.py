@@ -2,13 +2,13 @@ import io
 import fitz  # PyMuPDF
 from PIL import Image
 import google.generativeai as genai
-from ingestion.config import GEMINI_API_KEY
+from ingestion.config import GOOGLE_API_KEY
 
 def _get_gemini_model():
-    if not GEMINI_API_KEY:
-        raise ValueError("❌ Missing GEMINI_API_KEY in config.py")
+    if not GOOGLE_API_KEY:
+        raise ValueError("❌ Missing GOOGLE_API_KEY in config.py")
 
-    client = genai.Client(api_key=GEMINI_API_KEY)
+    client = genai.Client(api_key=GOOGLE_API_KEY)
     model = client.models.get("gemini-2.0-flash")
     return client, model
 

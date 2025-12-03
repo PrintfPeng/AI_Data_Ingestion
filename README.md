@@ -54,7 +54,7 @@ ai-data-ingestion-pipeline/
 │   ├── ocr_extractor.py        # OCR with Gemini
 │   ├── document_classifier.py  # Classify PDF type
 │   ├── table_extractor.py      # Extract tables
-│   └── config.py               # GEMINI_API_KEY and settings
+│   └── config.py               # GOOGLE_API_KEY and settings
 │
 ├── cleaning/
 │   └── ...
@@ -83,7 +83,7 @@ pip install -r requirements.txt
 
 สร้างไฟล์ .env:
 
-GEMINI_API_KEY=YOUR_KEY_HERE
+GOOGLE_API_KEY=YOUR_KEY_HERE
 
 🏃 Running the Pipeline
 Run everythingในคำสั่งเดียว

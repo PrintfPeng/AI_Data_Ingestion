@@ -82,7 +82,7 @@ def main() -> None:
     parser.add_argument(
         "--use-gemini",
         action="store_true",
-        help="Enable Gemini for section/text role tagging (if GEMINI_API_KEY is set)",
+        help="Enable Gemini for section/text role tagging (if GOOGLE_API_KEY is set)",
     )
     args = parser.parse_args()
 
