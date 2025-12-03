@@ -53,3 +53,9 @@ htmlcov/
 # --- Build ---
 build/
 dist/
+
+__pycache__/
+*.pyc
+chroma_db/
+ingested/
+.env
