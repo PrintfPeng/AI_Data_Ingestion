@@ -2,9 +2,27 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
+import os
+
+from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from .vector_store import search_similar
+
+
+# -------------------------------------------------------------------
+# ตั้งค่า LLM (Gemini)
+# -------------------------------------------------------------------
+
+# โหลด .env ให้ทับค่าเดิม (กัน Ghost Key)
+load_dotenv(override=True)
+_GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+if not _GOOGLE_API_KEY:
+    raise RuntimeError(
+        "GOOGLE_API_KEY is not set. Please add it to your .env or environment."
+    )
 
 
 def _get_llm() -> ChatGoogleGenerativeAI:
@@ -14,7 +32,8 @@ def _get_llm() -> ChatGoogleGenerativeAI:
     """
     llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash",
-        temperature=0.3,
+        temperature=0.2,          # ลดให้ตอบนิ่งขึ้นหน่อย
+        google_api_key=_GOOGLE_API_KEY,
     )
     return llm
 
@@ -30,8 +49,10 @@ def _rule_based_intent(query: str) -> Optional[str]:
     ใช้ได้กับเอกสารหลายประเภท ไม่ได้จำกัดแค่การเงิน
     """
     q = query.lower().strip()
+    if not q:
+        return None
 
-    # keyword ที่มักเกี่ยวข้องกับ "ตารางข้อมูล" ในหลาย ๆ โดเมน
+    # keyword ที่มักเกี่ยวข้องกับ "ตารางข้อมูล"
     table_keywords = [
         "ตาราง",
         "table",
@@ -70,16 +91,13 @@ def _rule_based_intent(query: str) -> Optional[str]:
     if is_table and not is_image:
         return "table"
     if is_image and not is_table:
-        # ตอนนี้เรายังไม่มี RAG ฝั่ง image แยกชัด → ถือเป็น both ไปก่อน
+        # ตอนนี้ยังไม่มี image RAG แยก → ถือเป็น both ไปก่อน
         return "both"
     if is_table and is_image:
         return "both"
 
-    # ถ้าไม่มี keyword พิเศษ → น่าจะถามเชิงเนื้อหาบรรยาย
-    if q:
-        return "text"
-
-    return None
+    # ส่วนใหญ่จะเป็นคำถามเชิงเนื้อหาบรรยาย
+    return "text"
 
 
 # -------------------------------------------------------------------
@@ -108,10 +126,17 @@ async def classify_query_intent(query: str) -> str:
 
     user_prompt = f"คำถาม: {query}\n\nตอบแค่หนึ่งคำ: text, table หรือ both"
 
-    resp = await llm.ainvoke(
-        [("system", system_prompt), ("user", user_prompt)]
-    )
-    raw = (resp.content or "").strip().lower()
+    try:
+        resp = await llm.ainvoke(
+            [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_prompt),
+            ]
+        )
+        raw = (resp.content or "").strip().lower()
+    except Exception:
+        # ถ้า LLM พัง ให้ fallback เป็น text ไปก่อน
+        return "text"
 
     if "both" in raw:
         return "both"
@@ -126,6 +151,7 @@ async def classify_query_intent(query: str) -> str:
 def _build_context_text(docs) -> str:
     """
     รวม context จากเอกสารที่ค้นมาให้ LLM
+    จำกัดความยาวคร่าว ๆ กันหลุดโควต้า
     """
     parts: List[str] = []
     for i, d in enumerate(docs, start=1):
@@ -139,7 +165,10 @@ def _build_context_text(docs) -> str:
             f"source={source}, doc_type={doc_type})"
         )
         parts.append(f"{header}\n{d.page_content}")
-    return "\n\n".join(parts)
+
+    # กันข้อความยาวเกิน: ตัดเอาประมาณ 12000 ตัวอักษรพอ
+    joined = "\n\n".join(parts)
+    return joined[:12000]
 
 
 # -------------------------------------------------------------------
@@ -148,8 +177,8 @@ def _build_context_text(docs) -> str:
 async def answer_question(
     query: str,
     doc_ids: Optional[List[str]] = None,
-    top_k: int = 5,
-    mode: str = "auto",  # "auto" | "text" | "table" | "both"
+    top_k: int = 10,          # เพิ่มค่า default หน่อย ให้ดึง context เยอะขึ้น
+    mode: str = "auto",       # "auto" | "text" | "table" | "both"
 ) -> Dict:
     """
     RAG flow:
@@ -217,7 +246,12 @@ async def answer_question(
         "(เช่น รายงานบริษัท รายงานวิชาการ คู่มือ สัญญา เอกสารการเงิน ฯลฯ).\n"
         "ให้ตอบคำถามโดยอ้างอิงเฉพาะจาก CONTEXT ด้านล่างนี้เท่านั้น "
         "ห้ามเดาเกินข้อมูลในเอกสาร.\n"
-        "ถ้าข้อมูลไม่พอ ให้ตอบว่า 'ไม่ทราบจากข้อมูลที่มีอยู่'.\n\n"
+        "- ถ้าใน CONTEXT มีรูปแบบ 'ถาม: ...' และ 'ตอบ: ...' "
+        "ให้จับคู่คำถามของผู้ใช้กับส่วน 'ถาม:' ที่ใกล้เคียงที่สุด "
+        "แล้วใช้ข้อความหลัง 'ตอบ:' เป็นคำตอบหลัก.\n"
+        "- ให้ถือว่าข้อมูลเพียงพอ ถ้าพบประโยคหรือย่อหน้าที่ชี้คำตอบอย่างชัดเจน.\n"
+        "- ให้ตอบว่า 'ไม่ทราบจากข้อมูลที่มีอยู่' เฉพาะกรณีที่ค้นหาแล้ว "
+        "ไม่พบคำตอบจริง ๆ เท่านั้น.\n\n"
         f"(query intent: {intent}, mode: {mode})\n\n"
         "=== CONTEXT START ===\n"
         f"{context_text}\n"
@@ -231,8 +265,8 @@ async def answer_question(
     llm = _get_llm()
     resp = await llm.ainvoke(
         [
-            ("system", system_prompt),
-            ("user", user_prompt),
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt),
         ]
     )
     answer_text = resp.content if hasattr(resp, "content") else str(resp)
